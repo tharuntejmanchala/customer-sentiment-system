@@ -1,3 +1,22 @@
+ 
+ # ===== Python / Flask =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+.env.*
+
+# ===== ML models (optional but recommended) =====
+*.h5
+*.pt
+*.onnx
+*.joblib
+
+# ===== SQLite DB =====
+*.db
+
 # Logs
 logs
 *.log

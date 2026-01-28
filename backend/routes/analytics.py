@@ -3,7 +3,7 @@ from database.db import get_all_history
 
 analytics_bp = Blueprint("analytics", __name__)
 
-@analytics_bp.route("/analytics", methods=["GET"])
+@analytics_bp.route("/", methods=["GET"])
 def analytics():
     rows = get_all_history()
 

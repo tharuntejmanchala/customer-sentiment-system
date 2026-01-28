@@ -5,7 +5,7 @@ from database.db import save_result
 
 sentiment_bp = Blueprint("sentiment", __name__)
 
-@sentiment_bp.route("/sentiment/text", methods=["POST"])
+@sentiment_bp.route("/text", methods=["POST"])
 def text_sentiment():
     data = request.get_json()
     text = data.get("text", "")
@@ -20,7 +20,7 @@ def text_sentiment():
     })
 
 
-@sentiment_bp.route("/sentiment/audio", methods=["POST"])
+@sentiment_bp.route("/audio", methods=["POST"])
 def audio_sentiment():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400

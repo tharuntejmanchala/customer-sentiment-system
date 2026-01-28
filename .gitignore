@@ -1,0 +1,62 @@
+############################
+# Python / Flask
+############################
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+venv/
+.env
+.env.*
+.python-version
+
+############################
+# Databases
+############################
+*.db
+*.sqlite
+*.sqlite3
+
+############################
+# Machine Learning models
+############################
+*.h5
+*.pt
+*.onnx
+*.joblib
+*.pkl
+
+############################
+# Node / React
+############################
+node_modules/
+dist/
+build/
+dist-ssr/
+*.local
+
+############################
+# Logs
+############################
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+############################
+# OS / Editor files
+############################
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
