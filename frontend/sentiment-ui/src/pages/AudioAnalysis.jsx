@@ -1,4 +1,5 @@
 import { useState } from "react";
+import api from "../api/axios"; // ✅ use axios instance with token
 
 export default function AudioAnalysis() {
   const [file, setFile] = useState(null);
@@ -6,68 +7,86 @@ export default function AudioAnalysis() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  const handleSubmit = async () => {
+  const handleAnalyze = async () => {
     if (!file) {
       setError("Please select an audio file");
       return;
     }
 
+    setLoading(true);
     setError("");
     setResult(null);
-    setLoading(true);
 
     try {
       const formData = new FormData();
-      // 🔴 THIS KEY MUST BE "file"
-      formData.append("file", file);
+      formData.append("file", file); // 🔑 MUST be "file"
 
-      const res = await fetch(
-        "http://127.0.0.1:5000/api/sentiment/audio",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Audio analysis failed");
-      }
-
-      setResult(data);
+      const res = await api.post("/sentiment/audio", formData);
+      setResult(res.data);
     } catch (err) {
-      setError(err.message);
+      console.error(err);
+      setError("Audio analysis failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: "40px", color: "white" }}>
-      <h1>Audio Sentiment Analysis</h1>
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <h2>Audio Sentiment Analysis</h2>
 
-      <input
-        type="file"
-        accept=".wav,.mp3,.m4a"
-        onChange={(e) => setFile(e.target.files[0])}
-      />
+        <input
+          type="file"
+          accept=".wav,.mp3,.m4a"
+          onChange={(e) => setFile(e.target.files[0])}
+          style={styles.input}
+        />
 
-      <br /><br />
+        <button onClick={handleAnalyze} disabled={loading} style={styles.button}>
+          {loading ? "Analyzing..." : "Analyze"}
+        </button>
 
-      <button onClick={handleSubmit} disabled={loading}>
-        {loading ? "Analyzing..." : "Analyze"}
-      </button>
+        {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {result && (
-        <div style={{ marginTop: "20px" }}>
-          <p><strong>Transcription:</strong> {result.transcription}</p>
-          <p><strong>Sentiment:</strong> {result.sentiment}</p>
-          <p><strong>Confidence:</strong> {result.confidence}</p>
-        </div>
-      )}
+        {result && (
+          <div style={{ marginTop: "20px" }}>
+            <p><b>Transcription:</b> {result.transcription}</p>
+            <p><b>Sentiment:</b> {result.sentiment}</p>
+            <p><b>Confidence:</b> {result.confidence}%</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#0f172a",
+    color: "white",
+  },
+  card: {
+    background: "#020617",
+    padding: "40px",
+    borderRadius: "12px",
+    width: "400px",
+  },
+  input: {
+    width: "100%",
+    marginBottom: "15px",
+  },
+  button: {
+    width: "100%",
+    padding: "10px",
+    background: "#3b82f6",
+    border: "none",
+    borderRadius: "8px",
+    color: "white",
+    cursor: "pointer",
+  },
+};

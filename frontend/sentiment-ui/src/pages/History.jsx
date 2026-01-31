@@ -23,7 +23,7 @@ export default function History() {
           <p><b>Sentiment:</b> {item[2]}</p>
           <p>
             <b>Confidence:</b>{" "}
-            {item[3] !== undefined ? (item[3] * 100).toFixed(2) : "0.00"}%
+            {item[3] !== undefined ? (item[3]).toFixed(2) : "0.00"}%
           </p>
           <p><b>Time:</b> {item[4]}</p>
         </div>
