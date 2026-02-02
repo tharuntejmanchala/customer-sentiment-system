@@ -1,26 +1,22 @@
-from werkzeug.security import generate_password_hash, check_password_hash
-
-# Temporary in-memory storage
-users = {}
+from database.db import create_user as db_create_user
+from database.db import verify_user as db_verify_user
 
 def create_user(name, email, password):
-    if email in users:
+    """
+    Creates user in DB.
+    Returns user dict {id, name, email} or None
+    """
+    success = db_create_user(name, email, password)
+    if not success:
         return None
 
-    hashed_password = generate_password_hash(password)
-    users[email] = {
-        "name": name,
-        "email": email,
-        "password": hashed_password
-    }
-    return users[email]
+    # fetch user again to get id
+    return db_verify_user(email, password)
+
 
 def authenticate_user(email, password):
-    user = users.get(email)
-    if not user:
-        return None
-
-    if not check_password_hash(user["password"], password):
-        return None
-
-    return user
+    """
+    Verifies user credentials.
+    Returns user dict {id, name, email} or None
+    """
+    return db_verify_user(email, password)

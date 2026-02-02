@@ -1,26 +1,30 @@
 from flask import Blueprint, jsonify
-from database.db import get_all_history
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from database.db import get_connection
 
 analytics_bp = Blueprint("analytics", __name__)
 
-@analytics_bp.route("/", methods=["GET"])
+@analytics_bp.route("", methods=["GET"])
+@jwt_required()
 def analytics():
-    rows = get_all_history()
+    user_id = int(get_jwt_identity())
 
-    total = len(rows)
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    positive = sum(1 for r in rows if r[2] == "positive")
-    neutral  = sum(1 for r in rows if r[2] == "neutral")
-    negative = sum(1 for r in rows if r[2] == "negative")
+    cursor.execute("""
+        SELECT
+            COUNT(*) as total,
+            SUM(sentiment = 'positive') as positive,
+            SUM(sentiment = 'neutral') as neutral,
+            SUM(sentiment = 'negative') as negative,
+            SUM(type = 'text') as text,
+            SUM(type = 'audio') as audio
+        FROM sentiment_history
+        WHERE user_id = ?
+    """, (user_id,))
 
-    text_count  = sum(1 for r in rows if r[0] == "text")
-    audio_count = sum(1 for r in rows if r[0] == "audio")
+    row = cursor.fetchone()
+    conn.close()
 
-    return jsonify({
-        "total": total,
-        "positive": positive,
-        "neutral": neutral,
-        "negative": negative,
-        "text": text_count,
-        "audio": audio_count
-    })
+    return jsonify(dict(row))
