@@ -21,7 +21,7 @@ try:
     from tensorflow.keras.layers import Input, Embedding, LSTM, Dense, Dropout, Bidirectional
     from tensorflow.keras.callbacks import EarlyStopping
     HAS_TENSORFLOW = True
-except ImportError:
+except Exception:
     tf = Tokenizer = pad_sequences = Model = None
     Input = Embedding = LSTM = Dense = Dropout = Bidirectional = EarlyStopping = None
 
