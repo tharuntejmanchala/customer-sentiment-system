@@ -36,7 +36,7 @@ whisper = "GeminiTranscriptionEngine"
 # ---------------------------------------------------------------------------
 import requests as _requests
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Header
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -145,7 +145,7 @@ def send_email(to_email: str, subject: str, body: str):
         msg['To'] = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'html'))
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
         server.starttls()
         server.login(SMTP_USER, SMTP_PASSWORD)
         server.send_message(msg)
@@ -877,7 +877,7 @@ class ResetPassword(BaseModel):
     new_password: str
 
 @app.post("/register")
-async def register(auth: UserAuth):
+async def register(auth: UserAuth, background_tasks: BackgroundTasks):
     try:
         existing = db_adapter.get_user(auth.username)
         if existing:
@@ -886,7 +886,7 @@ async def register(auth: UserAuth):
         otp = str(secrets.randbelow(900000) + 100000)
         otp_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
         db_adapter.save_user(auth.username, hashed_pw, is_verified=False, otp_code=otp, otp_expires=otp_expires)
-        send_email(auth.username, "CESTS - Verify your email", f"Your OTP is: <strong>{otp}</strong>. It expires in 15 minutes.")
+        background_tasks.add_task(send_email, auth.username, "CESTS - Verify your email", f"Your OTP is: <strong>{otp}</strong>. It expires in 15 minutes.")
         return {"message": "User registered successfully. Please verify your email with the OTP."}
     except HTTPException:
         raise
@@ -930,7 +930,7 @@ async def login(auth: UserAuth):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/forgot-password")
-async def forgot_password(data: ForgotPassword):
+async def forgot_password(data: ForgotPassword, background_tasks: BackgroundTasks):
     user = db_adapter.get_user(data.username)
     if not user:
         return {"message": "If that account exists, a reset link has been sent."}
@@ -940,7 +940,7 @@ async def forgot_password(data: ForgotPassword):
     
     # Dynamic reset URL could be constructed if we pass origin, but for now we'll assume relative frontend:
     reset_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', 'localhost:5173')}/reset-password?token={token}"
-    send_email(data.username, "CESTS - Password Reset", f"Click here to reset your password: <a href='{reset_url}'>{reset_url}</a>")
+    background_tasks.add_task(send_email, data.username, "CESTS - Password Reset", f"Click here to reset your password: <a href='{reset_url}'>{reset_url}</a>")
     return {"message": "If that account exists, a reset link has been sent."}
 
 @app.post("/reset-password")
