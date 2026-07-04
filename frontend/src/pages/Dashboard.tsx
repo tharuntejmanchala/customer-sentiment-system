@@ -161,13 +161,13 @@ export default function Dashboard() {
           <div className="card-title">Quick Actions</div>
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" onClick={() => navigate('/analyze')}>
+          <button className="btn btn-primary" onClick={() => navigate('/analyze', { state: { tab: 'record' } })}>
             🎙️ Record Audio
           </button>
-          <button className="btn btn-secondary" onClick={() => navigate('/analyze')}>
+          <button className="btn btn-secondary" onClick={() => navigate('/analyze', { state: { tab: 'upload' } })}>
             📄 Upload File
           </button>
-          <button className="btn btn-secondary" onClick={() => navigate('/analyze')}>
+          <button className="btn btn-secondary" onClick={() => navigate('/analyze', { state: { tab: 'text' } })}>
             ✏️ Analyze Text
           </button>
           <button className="btn btn-secondary" onClick={() => navigate('/analytics')}>

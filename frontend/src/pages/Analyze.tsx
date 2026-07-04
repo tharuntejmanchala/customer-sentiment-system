@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { analyzeText, analyzeAudio, saveRecording } from '../api';
 import type { AnalysisResult } from '../types';
 import SentimentGauge from '../components/SentimentGauge';
@@ -7,6 +8,7 @@ import SentimentBadge from '../components/SentimentBadge';
 type Tab = 'record' | 'upload' | 'text';
 
 export default function Analyze() {
+  const location = useLocation();
   const [tab, setTab] = useState<Tab>('text');
   const [text, setText] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -15,6 +17,13 @@ export default function Analyze() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    const locState = location.state as { tab?: Tab } | null;
+    if (locState && locState.tab) {
+      setTab(locState.tab);
+    }
+  }, [location.state]);
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
