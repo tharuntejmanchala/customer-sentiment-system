@@ -401,11 +401,15 @@ class DatabaseAdapter:
                 conn.execute("ALTER TABLE users ADD COLUMN reset_token_expires TEXT")
             except Exception:
                 pass
+            try:
+                conn.execute("ALTER TABLE recordings ADD COLUMN username TEXT")
+            except Exception:
+                pass
             conn.commit()
             conn.close()
             logger.info("Database Adapter: SQLite tables initialized.")
 
-    def save_recording(self, recording_id, filename, file_path, timestamp, duration, transcription, sentiment, confidence, summary):
+    def save_recording(self, recording_id, filename, file_path, timestamp, duration, transcription, sentiment, confidence, summary, username=None):
         if self.mode == "mongo":
             doc = {
                 "id": recording_id,
@@ -416,28 +420,35 @@ class DatabaseAdapter:
                 "transcription": transcription,
                 "sentiment": sentiment,
                 "confidence": confidence,
-                "summary": summary
+                "summary": summary,
+                "username": username.lower() if username else None
             }
             self.mongo_db.recordings.replace_one({"id": recording_id}, doc, upsert=True)
         else:
             conn = sqlite3.connect(DB_PATH)
             conn.execute(
                 """INSERT OR REPLACE INTO recordings
-                   (id, filename, file_path, timestamp, duration, transcription, sentiment, confidence, summary)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (recording_id, filename, file_path, timestamp, duration, transcription, sentiment, confidence, summary)
+                   (id, filename, file_path, timestamp, duration, transcription, sentiment, confidence, summary, username)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (recording_id, filename, file_path, timestamp, duration, transcription, sentiment, confidence, summary, username.lower() if username else None)
             )
             conn.commit()
             conn.close()
 
-    def get_all_recordings(self):
+    def get_all_recordings(self, username=None):
         if self.mode == "mongo":
-            cursor = self.mongo_db.recordings.find({}, {"_id": 0}).sort("timestamp", -1)
+            query = {}
+            if username:
+                query["username"] = username.lower()
+            cursor = self.mongo_db.recordings.find(query, {"_id": 0}).sort("timestamp", -1)
             return list(cursor)
         else:
             conn = sqlite3.connect(DB_PATH)
             conn.row_factory = sqlite3.Row
-            rows = conn.execute("SELECT * FROM recordings ORDER BY timestamp DESC").fetchall()
+            if username:
+                rows = conn.execute("SELECT * FROM recordings WHERE lower(username) = ? ORDER BY timestamp DESC", (username.lower(),)).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM recordings ORDER BY timestamp DESC").fetchall()
             res = [dict(r) for r in rows]
             conn.close()
             return res
@@ -878,7 +889,7 @@ async def save_recording(
 
         ts = timestamp or datetime.utcnow().isoformat()
         db_adapter.save_recording(
-            recording_id, audio.filename if audio else None, file_path, ts, duration, transcription, sentiment, confidence, summary
+            recording_id, audio.filename if audio else None, file_path, ts, duration, transcription, sentiment, confidence, summary, username=current_user
         )
         return {"recordingId": recording_id, "message": "Recording saved"}
 
@@ -990,7 +1001,7 @@ async def reset_password(data: ResetPassword):
 @app.get("/recordings")
 async def list_recordings(current_user: str = Depends(get_current_user)):
     try:
-        return db_adapter.get_all_recordings()
+        return db_adapter.get_all_recordings(username=current_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1028,7 +1039,7 @@ async def get_audio_file(recording_id: str, current_user: str = Depends(get_curr
 async def get_analytics(current_user: str = Depends(get_current_user)):
     """Aggregated sentiment analytics for charts and dashboard."""
     try:
-        data = db_adapter.get_all_recordings()
+        data = db_adapter.get_all_recordings(username=current_user)
 
         dist = {"positive": 0, "negative": 0, "neutral": 0}
         total_conf = 0.0
