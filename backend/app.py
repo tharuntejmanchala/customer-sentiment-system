@@ -38,7 +38,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 import requests as _requests
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -49,7 +49,13 @@ import re
 from dotenv import load_dotenv
 import uvicorn
 import aiofiles
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
+import secrets
+import jwt
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -82,6 +88,74 @@ if os.path.exists(winget_base):
 # Load .env
 # ---------------------------------------------------------------------------
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Security & Email Helpers
+# ---------------------------------------------------------------------------
+JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-default-key-please-change-in-prod")
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "noreply@cests.com")
+
+def hash_password(password: str, salt: bytes = None) -> str:
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+    return f"{salt.hex()}:{key.hex()}"
+
+def verify_password(stored_password: str, provided_password: str) -> bool:
+    try:
+        salt_hex, key_hex = stored_password.split(':')
+        salt = bytes.fromhex(salt_hex)
+        key = bytes.fromhex(key_hex)
+        new_key = hashlib.pbkdf2_hmac('sha256', provided_password.encode('utf-8'), salt, 100000)
+        return secrets.compare_digest(key, new_key)
+    except Exception:
+        return False
+
+def create_jwt_token(username: str) -> str:
+    payload = {
+        "sub": username,
+        "exp": datetime.utcnow() + timedelta(days=1)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+async def get_current_user(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized: Missing or invalid token")
+    token = authorization.split(" ")[1]
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        return username
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def send_email(to_email: str, subject: str, body: str):
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning(f"[EMAIL SIMULATION] To: {to_email} | Subject: {subject} | Body: {body}")
+        return True
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = SMTP_FROM
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'html'))
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {e}")
+        return False
 
 # ---------------------------------------------------------------------------
 # Gemini REST helper (no SDK)
@@ -214,6 +288,14 @@ class DatabaseAdapter:
                     password      TEXT
                 )
             """)
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0")
+                conn.execute("ALTER TABLE users ADD COLUMN otp_code TEXT")
+                conn.execute("ALTER TABLE users ADD COLUMN otp_expires TEXT")
+                conn.execute("ALTER TABLE users ADD COLUMN reset_token TEXT")
+                conn.execute("ALTER TABLE users ADD COLUMN reset_token_expires TEXT")
+            except Exception:
+                pass
             conn.commit()
             conn.close()
             logger.info("Database Adapter: SQLite tables initialized.")
@@ -277,21 +359,47 @@ class DatabaseAdapter:
             conn.close()
             return res
 
-    def save_user(self, username, password):
+    def save_user(self, username, password, is_verified=False, otp_code=None, otp_expires=None):
         if self.mode == "mongo":
             doc = {
                 "username": username.lower(),
-                "password": password
+                "password": password,
+                "is_verified": is_verified,
+                "otp_code": otp_code,
+                "otp_expires": otp_expires
             }
             self.mongo_db.users.replace_one({"username": username.lower()}, doc, upsert=True)
         else:
             conn = sqlite3.connect(DB_PATH)
             conn.execute(
-                "INSERT OR REPLACE INTO users (username, password) VALUES (?, ?)",
-                (username.lower(), password)
+                "INSERT OR REPLACE INTO users (username, password, is_verified, otp_code, otp_expires) VALUES (?, ?, ?, ?, ?)",
+                (username.lower(), password, int(is_verified), otp_code, otp_expires)
             )
             conn.commit()
             conn.close()
+
+    def update_user(self, username, fields: dict):
+        if self.mode == "mongo":
+            self.mongo_db.users.update_one({"username": username.lower()}, {"$set": fields})
+        else:
+            conn = sqlite3.connect(DB_PATH)
+            set_clause = ", ".join([f"{k} = ?" for k in fields.keys()])
+            values = list(fields.values())
+            values.append(username.lower())
+            conn.execute(f"UPDATE users SET {set_clause} WHERE lower(username) = ?", values)
+            conn.commit()
+            conn.close()
+
+    def get_user_by_reset_token(self, token):
+        if self.mode == "mongo":
+            return self.mongo_db.users.find_one({"reset_token": token}, {"_id": 0})
+        else:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM users WHERE reset_token = ?", (token,)).fetchone()
+            res = dict(row) if row else None
+            conn.close()
+            return res
 
 db_adapter = DatabaseAdapter()
 
@@ -532,7 +640,7 @@ async def health():
 
 
 @app.post("/analyze")
-async def analyze_text_route(body: AnalyzeRequest):
+async def analyze_text_route(body: AnalyzeRequest, current_user: str = Depends(get_current_user)):
     try:
         result = text_analyzer.analyze_text(body.text)
         return result
@@ -544,7 +652,8 @@ async def analyze_text_route(body: AnalyzeRequest):
 @app.post("/transcribe")
 async def transcribe_audio_route(
     audio: UploadFile = File(None),
-    text: str = Form(None)
+    text: str = Form(None),
+    current_user: str = Depends(get_current_user)
 ):
     try:
         if text:
@@ -583,7 +692,7 @@ async def transcribe_audio_route(
 
 
 @app.post("/train")
-async def train_model_route(body: TrainRequest):
+async def train_model_route(body: TrainRequest, current_user: str = Depends(get_current_user)):
     try:
         if not HAS_TENSORFLOW:
             raise HTTPException(status_code=400, detail="TensorFlow not available")
@@ -599,7 +708,7 @@ async def train_model_route(body: TrainRequest):
 
 
 @app.post("/audio")
-async def audio_analysis_route(audio: UploadFile = File(...)):
+async def audio_analysis_route(audio: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     tmp_path = None
     try:
         if not HAS_WHISPER or whisper_model is None:
@@ -635,7 +744,7 @@ async def audio_analysis_route(audio: UploadFile = File(...)):
 
 
 @app.post("/upload")
-async def upload_file(audio: UploadFile = File(...)):
+async def upload_file(audio: UploadFile = File(...), current_user: str = Depends(get_current_user)):
     dest = os.path.join(UPLOADS_DIR, audio.filename or f"upload_{uuid.uuid4()}")
     async with aiofiles.open(dest, 'wb') as f:
         await f.write(await audio.read())
@@ -651,6 +760,7 @@ async def save_recording(
     sentiment: str = Form(""),
     confidence: float = Form(0.0),
     summary: str = Form(""),
+    current_user: str = Depends(get_current_user)
 ):
     try:
         recording_id = str(uuid.uuid4())
@@ -680,29 +790,63 @@ class UserAuth(BaseModel):
     username: str
     password: str
 
+class VerifyOTP(BaseModel):
+    username: str
+    otp: str
+
+class ForgotPassword(BaseModel):
+    username: str
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
+
 @app.post("/register")
 async def register(auth: UserAuth):
     try:
         existing = db_adapter.get_user(auth.username)
         if existing:
             raise HTTPException(status_code=400, detail="Username is already taken.")
-        db_adapter.save_user(auth.username, auth.password)
-        return {"message": "User registered successfully."}
+        hashed_pw = hash_password(auth.password)
+        otp = str(secrets.randbelow(900000) + 100000)
+        otp_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        db_adapter.save_user(auth.username, hashed_pw, is_verified=False, otp_code=otp, otp_expires=otp_expires)
+        send_email(auth.username, "CESTS - Verify your email", f"Your OTP is: <strong>{otp}</strong>. It expires in 15 minutes.")
+        return {"message": "User registered successfully. Please verify your email with the OTP."}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in /register: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/verify-otp")
+async def verify_otp(data: VerifyOTP):
+    user = db_adapter.get_user(data.username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("is_verified"):
+        return {"message": "Already verified"}
+    if user.get("otp_code") != data.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    try:
+        expires = datetime.fromisoformat(user.get("otp_expires"))
+        if datetime.utcnow() > expires:
+            raise HTTPException(status_code=400, detail="OTP expired")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid OTP expiration")
+    db_adapter.update_user(data.username, {"is_verified": 1, "otp_code": None, "otp_expires": None})
+    token = create_jwt_token(data.username)
+    return {"message": "Email verified successfully", "token": token, "username": data.username}
+
 @app.post("/login")
 async def login(auth: UserAuth):
     try:
         user = db_adapter.get_user(auth.username)
-        if user and user["password"] == auth.password:
-            # Capitalize name display
-            name = user["username"].split("@")[0].replace("[0-9]", "")
-            name = name.capitalize()
-            return {"authenticated": True, "username": user["username"]}
+        if user and verify_password(user["password"], auth.password):
+            if not user.get("is_verified"):
+                raise HTTPException(status_code=403, detail="Email not verified. Please verify your email first.")
+            token = create_jwt_token(auth.username)
+            return {"authenticated": True, "username": user["username"], "token": token}
         raise HTTPException(status_code=401, detail="Invalid username or password.")
     except HTTPException:
         raise
@@ -710,8 +854,38 @@ async def login(auth: UserAuth):
         logger.error(f"Error in /login: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/forgot-password")
+async def forgot_password(data: ForgotPassword):
+    user = db_adapter.get_user(data.username)
+    if not user:
+        return {"message": "If that account exists, a reset link has been sent."}
+    token = secrets.token_urlsafe(32)
+    expires = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+    db_adapter.update_user(data.username, {"reset_token": token, "reset_token_expires": expires})
+    
+    # Dynamic reset URL could be constructed if we pass origin, but for now we'll assume relative frontend:
+    reset_url = f"https://{os.getenv('RENDER_EXTERNAL_HOSTNAME', 'localhost:5173')}/reset-password?token={token}"
+    send_email(data.username, "CESTS - Password Reset", f"Click here to reset your password: <a href='{reset_url}'>{reset_url}</a>")
+    return {"message": "If that account exists, a reset link has been sent."}
+
+@app.post("/reset-password")
+async def reset_password(data: ResetPassword):
+    user = db_adapter.get_user_by_reset_token(data.token)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+    try:
+        expires = datetime.fromisoformat(user.get("reset_token_expires"))
+        if datetime.utcnow() > expires:
+            raise HTTPException(status_code=400, detail="Reset token expired.")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid token expiration.")
+    
+    hashed_pw = hash_password(data.new_password)
+    db_adapter.update_user(user["username"], {"password": hashed_pw, "reset_token": None, "reset_token_expires": None})
+    return {"message": "Password reset successfully."}
+
 @app.get("/recordings")
-async def list_recordings():
+async def list_recordings(current_user: str = Depends(get_current_user)):
     try:
         return db_adapter.get_all_recordings()
     except Exception as e:
@@ -719,7 +893,7 @@ async def list_recordings():
 
 
 @app.get("/recordings/{recording_id}")
-async def get_recording(recording_id: str):
+async def get_recording(recording_id: str, current_user: str = Depends(get_current_user)):
     try:
         row = db_adapter.get_recording(recording_id)
         if row is None:
@@ -732,7 +906,7 @@ async def get_recording(recording_id: str):
 
 
 @app.get("/audio-file/{recording_id}")
-async def get_audio_file(recording_id: str):
+async def get_audio_file(recording_id: str, current_user: str = Depends(get_current_user)):
     try:
         row = db_adapter.get_recording(recording_id)
         if row is None:
@@ -748,7 +922,7 @@ async def get_audio_file(recording_id: str):
 
 
 @app.get("/analytics")
-async def get_analytics():
+async def get_analytics(current_user: str = Depends(get_current_user)):
     """Aggregated sentiment analytics for charts and dashboard."""
     try:
         data = db_adapter.get_all_recordings()

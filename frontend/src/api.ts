@@ -3,8 +3,25 @@ import type { AnalysisResult, Recording, Analytics, HealthStatus } from './types
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, options);
+  const token = localStorage.getItem('token');
+  const headers = new Headers(options?.headers || {});
+  
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers
+  });
+
   if (!res.ok) {
+    if (res.status === 401 && path !== '/login') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('authenticated');
+      window.location.href = '/login';
+    }
     const err = await res.text();
     let msg = `Request failed: ${res.status}`;
     try { msg = JSON.parse(err).detail || msg; } catch { /* noop */ }
@@ -95,10 +112,34 @@ export const registerUser = (username: string, password: string): Promise<{ mess
     body: JSON.stringify({ username, password }),
   });
 
+/** Verify OTP */
+export const verifyOtp = (username: string, otp: string): Promise<{ message: string, token?: string, username?: string }> =>
+  request('/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, otp }),
+  });
+
 /** Login a user */
-export const loginUser = (username: string, password: string): Promise<{ authenticated: boolean; username: string }> =>
+export const loginUser = (username: string, password: string): Promise<{ authenticated: boolean; username: string; token: string }> =>
   request('/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
+  });
+
+/** Forgot Password */
+export const forgotPassword = (username: string): Promise<{ message: string }> =>
+  request('/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+
+/** Reset Password */
+export const resetPassword = (token: string, new_password: string): Promise<{ message: string }> =>
+  request('/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password }),
   });

@@ -33,22 +33,11 @@ export default function Register() {
       .then(() => {
         setSuccess(true);
         setTimeout(() => {
-          navigate('/login');
+          navigate('/verify-email', { state: { username } });
         }, 1500);
       })
-      .catch(() => {
-        // Fallback for mock registration check locally if backend offline
-        const usernameKey = username.toLowerCase();
-        const existingUser = localStorage.getItem(`user_${usernameKey}`);
-        if (existingUser) {
-          setError('Username is already taken.');
-        } else {
-          localStorage.setItem(`user_${usernameKey}`, JSON.stringify({ password }));
-          setSuccess(true);
-          setTimeout(() => {
-            navigate('/login');
-          }, 1500);
-        }
+      .catch((err) => {
+        setError(err.message || 'Registration failed.');
       })
       .finally(() => {
         setLoading(false);

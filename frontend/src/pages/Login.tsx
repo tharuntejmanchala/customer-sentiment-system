@@ -21,18 +21,17 @@ export default function Login() {
 
     loginUser(username, password)
       .then(res => {
+        localStorage.setItem('token', res.token);
         localStorage.setItem('authenticated', 'true');
         localStorage.setItem('currentUser', res.username);
         navigate('/dashboard');
       })
       .catch(err => {
-        // Fallback for default mock admin account if offline or backend unavailable
-        if (username.toLowerCase() === 'admin' && password === 'admin') {
-          localStorage.setItem('authenticated', 'true');
-          localStorage.setItem('currentUser', 'Admin');
-          navigate('/dashboard');
+        if (err.message && err.message.toLowerCase().includes('verify')) {
+           // Redirect to verify email if the error mentions it
+           navigate('/verify-email', { state: { username } });
         } else {
-          setError(err.message || 'Invalid username or password.');
+           setError(err.message || 'Invalid username or password.');
         }
       })
       .finally(() => {
@@ -106,16 +105,21 @@ export default function Login() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary w-full mt-2" disabled={loading}>
-            {loading ? <><div className="spinner" /> Signing in...</> : 'Sign In'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: -8 }}>
+            <Link to="/forgot-password" style={{ color: 'var(--text-muted)', fontSize: 12, textDecoration: 'none' }}>
+              Forgot password?
+            </Link>
+          </div>
+
+          <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: 8 }}>
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--text-secondary)' }}>
-          Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--color-primary-light)', fontWeight: 600, textDecoration: 'none' }}>
-            Register here
-          </Link>
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            Don't have an account? <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Create one</Link>
+          </p>
         </div>
       </div>
     </div>

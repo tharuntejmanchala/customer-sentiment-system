@@ -7,10 +7,13 @@ import Analytics from './pages/Analytics';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 
 function ProtectedLayout() {
-  const isAuthenticated = localStorage.getItem('authenticated') === 'true';
-  if (!isAuthenticated) {
+  const token = localStorage.getItem('token');
+  if (!token) {
     return <Navigate to="/login" replace />;
   }
   return (
@@ -26,6 +29,9 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Protected Routes */}
       <Route element={<ProtectedLayout />}>

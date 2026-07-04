@@ -12,3 +12,4 @@ numpy
 aiofiles
 pymongo
 pymongo[srv]
+PyJWT==2.8.0

@@ -45,6 +45,24 @@ export default function Header({ title, subtitle }: HeaderProps) {
           </svg>
           {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
         </div>
+        <button 
+          onClick={() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('authenticated');
+            localStorage.removeItem('currentUser');
+            window.location.href = '/login';
+          }}
+          style={{
+            fontSize: 12,
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-danger)',
+            cursor: 'pointer',
+            padding: '4px 8px',
+            fontWeight: 600,
+          }}>
+          Logout
+        </button>
       </div>
     </header>
   );
