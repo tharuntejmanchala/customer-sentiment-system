@@ -1,8 +1,10 @@
+setuptools
+wheel
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.12
 tensorflow==2.15.0
-openai-whisper==20231117
+openai-whisper
 nltk==3.9.1
 numpy<2.0
 requests
