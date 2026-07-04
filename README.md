@@ -29,12 +29,15 @@ The CESTS aims to help businesses track the sentiments of customer interactions 
 ## Technologies Used
 
 ### Backend:
-- **Flask**: A lightweight web framework for Python, used to build the API endpoints (`/analyze`, `/transcribe`, `/train`, `/upload`).
+- **FastAPI**: A modern, high-performance Python web framework used to build the API endpoints (`/health`, `/analyze`, `/transcribe`, `/train`, `/upload`, `/audio`, `/save-recording`, `/recordings`, `/recordings/{id}`, `/audio-file/{id}`).
+- **Uvicorn**: An ASGI server used to run the FastAPI application.
+- **SQLite**: Embedded database used to persist recording metadata and history locally.
 - **TensorFlow**: A deep learning framework for building, training, and deploying machine learning models, specifically for sentiment analysis.
 - **Whisper**: An open-source automatic speech recognition (ASR) model developed by OpenAI, used to transcribe audio files to text.
 - **NLTK (Natural Language Toolkit)**: A Python library for natural language processing, specifically used for sentiment analysis with the VADER sentiment analysis tool.
 - **Pickle**: Used to serialize and save the tokenizer object.
-- **requests**: A Python HTTP library used to make requests, e.g., sending transcriptions to the `/analyze` endpoint.
+- **python-multipart**: Enables multipart form data and file upload support in FastAPI.
+- **aiofiles**: Async file I/O for FastAPI endpoints handling file uploads.
 - **dotenv**: A Python library used to load environment variables from a `.env` file.
 
 ### Frontend:
@@ -42,7 +45,7 @@ The CESTS aims to help businesses track the sentiments of customer interactions 
 - **Axios**: A promise-based HTTP client for the browser and Node.js, used to make API requests to the backend.
 - **Bootstrap**: A front-end framework for developing responsive and mobile-first websites, used to style the frontend application.
 - **React Router**: A routing library for React, used to navigate between different components in the frontend.
-- **Flask-CORS**: A Flask extension to handle Cross-Origin Resource Sharing (CORS), enabling the backend API to be accessed from different origins.
+- **CORS Middleware**: FastAPI's built-in CORSMiddleware handles Cross-Origin Resource Sharing, enabling the backend API to be accessed from different origins.
 
 ### Cloud/Infrastructure:
 - **FFmpeg**: A multimedia framework used for audio and video file processing, included in the environment to support Whisper transcription.
@@ -69,7 +72,7 @@ The CESTS aims to help businesses track the sentiments of customer interactions 
 3. Install dependencies for the backend:
 
    ```bash
-   pip install Flask TensorFlow Whisper nltk requests python-dotenv flask-cors
+   pip install -r backend/requirements.txt
    ```
 
 4. Install **FFmpeg** for audio processing. On most systems, you can install FFmpeg using the following commands:
@@ -99,8 +102,13 @@ The CESTS aims to help businesses track the sentiments of customer interactions 
 7. Run the backend server:
 
    ```bash
-   python app.py
+   python backend/app.py
    ```
+   Or with auto-reload during development:
+   ```bash
+   python -m uvicorn app:app --host 0.0.0.0 --port 5000 --reload
+   ```
+   Interactive API docs will be available at: `http://127.0.0.1:5000/docs`
 
 ### Frontend:
 
@@ -126,10 +134,18 @@ The frontend will be available at `http://localhost:3000`.
 
 Once the application is running, you can interact with the system through the following endpoints:
 
-- **POST /analyze**: Analyzes the sentiment of customer feedback (text).
-- **POST /transcribe**: Transcribes audio feedback into text using the Whisper ASR model.
+- **GET  /health**: Health check endpoint – confirms the API is running.
+- **POST /analyze**: Analyses the sentiment of customer feedback (text).
+- **POST /transcribe**: Transcribes audio feedback into text (and optionally analyses sentiment).
 - **POST /train**: Trains the sentiment analysis model with new data.
-- **POST /upload**: Uploads audio files for transcription and analysis.
+- **POST /audio**: Full pipeline – transcribes audio and analyses sentiment in one call.
+- **POST /upload**: Simple file upload endpoint.
+- **POST /save-recording**: Saves a recording (audio file + metadata) to SQLite + disk.
+- **GET  /recordings**: Returns all saved recording metadata ordered by timestamp.
+- **GET  /recordings/{id}**: Returns metadata for a specific recording.
+- **GET  /audio-file/{id}**: Streams the audio binary for a stored recording.
+
+Interactive API documentation (Swagger UI) is automatically available at `http://127.0.0.1:5000/docs`.
 
 ## Contributing
 

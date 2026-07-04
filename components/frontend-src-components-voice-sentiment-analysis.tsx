@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, Upload, Moon, Sun, Star, Mic, Square, Clock, ChevronRight } from "lucide-react"
+import { Loader2, Upload, Moon, Sun, Star, Mic, Square, Clock, ChevronRight, Key } from "lucide-react"
 import { useTheme } from "next-themes"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -57,6 +57,13 @@ export function VoiceSentimentAnalysisComponent() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null)
   const [apiAvailable, setApiAvailable] = useState(true)
+  const [groqApiKey, setGroqApiKey] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem("groqApiKey") || "" : ""))
+
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setGroqApiKey(val)
+    localStorage.setItem("groqApiKey", val)
+  }
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -358,8 +365,15 @@ export function VoiceSentimentAnalysisComponent() {
       formData.append("audio", audioFile)
 
       // Send to your audio analysis endpoint
+      const headers: HeadersInit = {}
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem("groqApiKey") : null
+      if (apiKey) {
+        headers["x-groq-api-key"] = apiKey
+      }
+
       const response = await fetch("http://127.0.0.1:5000/audio", {
         method: "POST",
+        headers: headers,
         body: formData,
       })
 
@@ -521,8 +535,15 @@ export function VoiceSentimentAnalysisComponent() {
 
       if (file) {
         formData.append("audio", file)
+        const headers: HeadersInit = {}
+        const apiKey = typeof window !== 'undefined' ? localStorage.getItem("groqApiKey") : null
+        if (apiKey) {
+          headers["x-groq-api-key"] = apiKey
+        }
+
         const response = await fetch("http://127.0.0.1:5000/audio", {
           method: "POST",
+          headers: headers,
           body: formData,
         })
 
@@ -575,8 +596,15 @@ export function VoiceSentimentAnalysisComponent() {
         }
       } else if (text) {
         formData.append("text", text)
+        const headers: HeadersInit = {}
+        const apiKey = typeof window !== 'undefined' ? localStorage.getItem("groqApiKey") : null
+        if (apiKey) {
+          headers["x-groq-api-key"] = apiKey
+        }
+
         const response = await fetch("http://127.0.0.1:5000/transcribe", {
           method: "POST",
+          headers: headers,
           body: formData,
         })
 
@@ -650,8 +678,20 @@ export function VoiceSentimentAnalysisComponent() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-end mb-4">
-        <Button variant="outline" size="icon" onClick={toggleTheme} className="rounded-full">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-muted/30 p-3 rounded-lg border">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Key className="h-4 w-4 text-muted-foreground" />
+          <Label htmlFor="api-key-input" className="text-sm font-medium whitespace-nowrap">Groq API Key (optional):</Label>
+          <Input
+            id="api-key-input"
+            type="password"
+            placeholder="Paste your gsk_... key for AI summaries"
+            value={groqApiKey}
+            onChange={handleApiKeyChange}
+            className="h-8 max-w-xs text-xs"
+          />
+        </div>
+        <Button variant="outline" size="icon" onClick={toggleTheme} className="rounded-full shrink-0">
           {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
       </div>
