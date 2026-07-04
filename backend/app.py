@@ -316,7 +316,10 @@ class DatabaseAdapter:
                     self.client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=2000)
                     # Trigger server check
                     self.client.admin.command('ping')
-                    self.mongo_db = self.client.get_database()
+                    try:
+                        self.mongo_db = self.client.get_default_database()
+                    except Exception:
+                        self.mongo_db = self.client["cests"]
                     self.mode = "mongo"
                     logger.info("Database Adapter: Connected successfully to MongoDB Atlas.")
                 except Exception as e:
