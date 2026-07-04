@@ -96,6 +96,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM", "noreply@cests.com")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 
 def hash_password(password: str, salt: bytes = None) -> str:
     if salt is None:
@@ -136,6 +137,32 @@ async def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def send_email(to_email: str, subject: str, body: str):
+    if RESEND_API_KEY:
+        try:
+            from_email = os.getenv("SMTP_FROM", "onboarding@resend.dev")
+            if from_email == "noreply@cests.com":
+                from_email = "onboarding@resend.dev"
+                
+            url = "https://api.resend.com/emails"
+            headers = {
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "from": from_email,
+                "to": to_email,
+                "subject": subject,
+                "html": body
+            }
+            res = _requests.post(url, headers=headers, json=payload, timeout=10)
+            if res.status_code in [200, 201]:
+                logger.info(f"Email sent successfully via Resend API to {to_email}")
+                return True
+            else:
+                logger.error(f"Resend API error: {res.status_code} - {res.text}")
+        except Exception as e:
+            logger.error(f"Failed to send email via Resend API: {e}")
+
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
         logger.warning(f"[EMAIL SIMULATION] To: {to_email} | Subject: {subject} | Body: {body}")
         return True
