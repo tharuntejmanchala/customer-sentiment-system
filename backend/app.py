@@ -7,6 +7,7 @@ import sqlite3
 import uuid
 import numpy as np
 import base64
+import urllib.parse
 
 # ---------------------------------------------------------------------------
 # Optional: TensorFlow
@@ -271,10 +272,39 @@ except ImportError:
     pymongo = None
     MongoClient = None
 
+def clean_mongo_uri(uri: str) -> str:
+    if not uri:
+        return uri
+    try:
+        prefix = ""
+        if uri.startswith("mongodb+srv://"):
+            prefix = "mongodb+srv://"
+        elif uri.startswith("mongodb://"):
+            prefix = "mongodb://"
+        else:
+            return uri
+            
+        rest = uri[len(prefix):]
+        if '@' not in rest:
+            return uri
+            
+        cred_part, host_part = rest.rsplit('@', 1)
+        if ':' not in cred_part:
+            return uri
+            
+        user, password = cred_part.split(':', 1)
+        escaped_user = urllib.parse.quote_plus(user)
+        escaped_password = urllib.parse.quote_plus(password)
+        
+        return f"{prefix}{escaped_user}:{escaped_password}@{host_part}"
+    except Exception:
+        return uri
+
 # Database Adapter
 class DatabaseAdapter:
     def __init__(self):
-        self.mongo_uri = os.getenv("MONGO_URI")
+        raw_uri = os.getenv("MONGO_URI")
+        self.mongo_uri = clean_mongo_uri(raw_uri)
         self.mode = "sqlite"
         self.client = None
         self.mongo_db = None
