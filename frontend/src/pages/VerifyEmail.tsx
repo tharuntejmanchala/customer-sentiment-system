@@ -54,7 +54,7 @@ export default function VerifyEmail() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <h2 style={{ fontSize: 24, fontWeight: 800 }}>Verify Email</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-            We've sent a 6-digit OTP to <strong>{username}</strong>. Check your console logs if SMTP is not configured.
+            We've sent a 6-digit OTP to <strong>{username}</strong>.
           </p>
         </div>
 

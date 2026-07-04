@@ -12,7 +12,7 @@ export default function ForgotPassword() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
-      setError('Please enter your username/email.');
+      setError('Please enter your email.');
       return;
     }
 
@@ -52,11 +52,11 @@ export default function ForgotPassword() {
         {!message ? (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="input-group">
-              <label htmlFor="username">Username / Email</label>
+              <label htmlFor="username">Email Address</label>
               <input
                 id="username"
-                type="text"
-                placeholder="Enter your username"
+                type="email"
+                placeholder="Enter your email"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 required

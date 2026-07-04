@@ -87,17 +87,17 @@ export default function Register() {
 
         {success && (
           <div className="alert alert-success mb-4" style={{ padding: '8px 12px', fontSize: 12.5 }}>
-            Registration successful! Redirecting to login...
+            Registration successful! Redirecting to email verification...
           </div>
         )}
 
         <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="input-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">Email Address</label>
             <input
               id="username"
-              type="text"
-              placeholder="Choose a username"
+              type="email"
+              placeholder="Enter your email"
               value={username}
               onChange={e => setUsername(e.target.value)}
               required

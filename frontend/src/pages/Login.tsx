@@ -31,7 +31,7 @@ export default function Login() {
            // Redirect to verify email if the error mentions it
            navigate('/verify-email', { state: { username } });
         } else {
-           setError(err.message || 'Invalid username or password.');
+           setError(err.message || 'Invalid email or password.');
         }
       })
       .finally(() => {
@@ -82,11 +82,11 @@ export default function Login() {
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="input-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">Email Address</label>
             <input
               id="username"
-              type="text"
-              placeholder="Enter your username"
+              type="email"
+              placeholder="Enter your email"
               value={username}
               onChange={e => setUsername(e.target.value)}
               required
