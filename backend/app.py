@@ -153,6 +153,7 @@ def send_email(to_email: str, subject: str, body: str):
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
+        logger.warning(f"[EMAIL FALLBACK LOG] To: {to_email} | Subject: {subject} | Body: {body}")
         return False
 
 # ---------------------------------------------------------------------------
