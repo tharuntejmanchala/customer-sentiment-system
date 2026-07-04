@@ -6,6 +6,7 @@ import pickle
 import sqlite3
 import uuid
 import numpy as np
+import base64
 
 # ---------------------------------------------------------------------------
 # Optional: TensorFlow
@@ -24,14 +25,10 @@ except ImportError:
     Input = Embedding = LSTM = Dense = Dropout = Bidirectional = EarlyStopping = None
 
 # ---------------------------------------------------------------------------
-# Optional: Whisper
+# Optional: Whisper Mock using Gemini API
 # ---------------------------------------------------------------------------
-HAS_WHISPER = False
-try:
-    import whisper
-    HAS_WHISPER = True
-except ImportError:
-    whisper = None
+HAS_WHISPER = True
+whisper = "GeminiTranscriptionEngine"
 
 # ---------------------------------------------------------------------------
 # Gemini REST API (no SDK — avoids protobuf conflicts)
@@ -182,6 +179,61 @@ def _call_gemini(prompt: str, max_tokens: int = 1500) -> str:
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
+def transcribe_audio_via_gemini(audio_path: str) -> str:
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY not set")
+    try:
+        with open(audio_path, 'rb') as f:
+            audio_data = f.read()
+        
+        ext = os.path.splitext(audio_path)[-1].lower()
+        if ext == '.mp3':
+            mime_type = 'audio/mp3'
+        elif ext == '.wav':
+            mime_type = 'audio/wav'
+        elif ext in ['.webm', '.weba']:
+            mime_type = 'audio/webm'
+        elif ext == '.ogg':
+            mime_type = 'audio/ogg'
+        else:
+            mime_type = 'audio/wav'
+            
+        base64_audio = base64.b64encode(audio_data).decode('utf-8')
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {
+                        "inlineData": {
+                            "mimeType": mime_type,
+                            "data": base64_audio
+                        }
+                    },
+                    {
+                        "text": "Transcribe this audio file accurately. Return only the transcription text, nothing else. If there is no speech, return an empty string."
+                    }
+                ]
+            }]
+        }
+        
+        headers = {
+            "Content-Type": "application/json"
+        }
+        
+        url = f"{_GEMINI_URL}?key={GEMINI_API_KEY}"
+        res = _requests.post(url, headers=headers, json=payload, timeout=60)
+        if res.status_code != 200:
+            logger.error(f"Gemini API returned status {res.status_code}: {res.text}")
+            raise ValueError(f"Gemini transcription failed: {res.text}")
+            
+        data = res.json()
+        text = data['candidates'][0]['content']['parts'][0]['text']
+        return text.strip()
+    except Exception as e:
+        logger.error(f"Error in Gemini transcription: {e}")
+        raise
+
+
 if GEMINI_API_KEY:
     logger.info("Gemini REST API configured (gemini-2.5-flash).")
 else:
@@ -207,15 +259,7 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 # ---------------------------------------------------------------------------
 # Whisper (loaded once at startup)
 # ---------------------------------------------------------------------------
-whisper_model = None
-if HAS_WHISPER:
-    try:
-        logger.info("Loading Whisper model (this may take a moment)...")
-        whisper_model = whisper.load_model("base")
-        logger.info("Whisper model loaded.")
-    except Exception as e:
-        logger.error(f"Error loading Whisper model: {e}")
-        HAS_WHISPER = False
+whisper_model = "GeminiTranscriptionEngine"
 
 # Try importing pymongo for MongoDB connectivity
 MONGO_AVAILABLE = False
@@ -673,8 +717,7 @@ async def transcribe_audio_route(
             tmp_path = tmp.name
 
         try:
-            result = whisper_model.transcribe(tmp_path)
-            transcription = result['text']
+            transcription = transcribe_audio_via_gemini(tmp_path)
         finally:
             try:
                 os.remove(tmp_path)
@@ -722,8 +765,7 @@ async def audio_analysis_route(audio: UploadFile = File(...), current_user: str 
             tmp.write(content)
             tmp_path = tmp.name
 
-        result = whisper_model.transcribe(tmp_path)
-        transcription = result['text']
+        transcription = transcribe_audio_via_gemini(tmp_path)
         if not transcription.strip():
             raise HTTPException(status_code=400, detail="No speech detected")
 
