@@ -107,3 +107,19 @@ export const getRecording = (id: string): Promise<Recording> =>
 /** Get analytics */
 export const getAnalytics = (): Promise<Analytics> =>
   request('/analytics');
+
+/** Request OTP code to be sent to email */
+export const requestOtp = (email: string): Promise<{ message: string }> =>
+  request('/api/auth/otp-request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+
+/** Verify OTP code and retrieve custom token */
+export const verifyOtpCode = (email: string, otp: string): Promise<{ custom_token: string }> =>
+  request('/api/auth/otp-verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });

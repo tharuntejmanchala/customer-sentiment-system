@@ -132,7 +132,39 @@ async def get_current_user(authorization: str = Header(None)):
     except Exception as e:
         logger.error(f"Token verification failed: {e}")
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
-# send_email helper deleted
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+
+def send_email(to_email: str, subject: str, body: str):
+    logger.info(f"[EMAIL SEND ATTEMPT] To: {to_email} | Subject: {subject}")
+    if RESEND_API_KEY:
+        try:
+            from_email = os.getenv("SMTP_FROM", "onboarding@resend.dev")
+            if from_email == "noreply@cests.com":
+                from_email = "onboarding@resend.dev"
+                
+            url = "https://api.resend.com/emails"
+            headers = {
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "from": from_email,
+                "to": to_email,
+                "subject": subject,
+                "html": body
+            }
+            res = _requests.post(url, json=payload, headers=headers, timeout=10)
+            if res.status_code in [200, 201]:
+                logger.info(f"Email sent successfully via Resend API to {to_email}")
+                return True
+            else:
+                logger.error(f"Resend API error: {res.status_code} - {res.text}")
+        except Exception as e:
+            logger.error(f"Failed to send email via Resend API: {e}")
+            
+    # Dev / Local Simulation mode fallback logger print
+    logger.warning(f"[EMAIL SIMULATION LOG] To: {to_email} | Subject: {subject} | Body: {body}")
+    return True
 
 # ---------------------------------------------------------------------------
 # Gemini REST helper (no SDK)
@@ -849,7 +881,73 @@ async def save_recording(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Custom auth schemas and routes deleted (authentication is now managed by Firebase)
+import secrets
+
+class OtpRequest(BaseModel):
+    email: str
+
+class OtpVerify(BaseModel):
+    email: str
+    otp: str
+
+@app.post("/api/auth/otp-request")
+async def request_otp_route(body: OtpRequest, background_tasks: BackgroundTasks):
+    email = body.email.strip().lower()
+    try:
+        user = db_adapter.get_user(email)
+        if not user:
+            db_adapter.save_user(email, "firebase-otp-flow-placeholder", is_verified=False)
+            
+        otp = str(secrets.randbelow(900000) + 100000)
+        otp_expires = (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        
+        db_adapter.update_user(email, {"otp_code": otp, "otp_expires": otp_expires})
+        
+        background_tasks.add_task(
+            send_email,
+            email,
+            "CESTS - Verification Code",
+            f"Your CESTS login verification code is: <strong>{otp}</strong>. It expires in 15 minutes."
+        )
+        return {"message": "OTP verification code sent to your email."}
+    except Exception as e:
+        logger.error(f"Error in /api/auth/otp-request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/otp-verify")
+async def verify_otp_route(body: OtpVerify):
+    email = body.email.strip().lower()
+    user = db_adapter.get_user(email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    stored_otp = user.get("otp_code")
+    stored_expires = user.get("otp_expires")
+    
+    if not stored_otp or stored_otp != body.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP code.")
+        
+    try:
+        expires = datetime.fromisoformat(stored_expires)
+        if datetime.utcnow() > expires:
+            raise HTTPException(status_code=400, detail="OTP code has expired.")
+    except Exception:
+         raise HTTPException(status_code=400, detail="Invalid OTP expiration format.")
+         
+    try:
+        db_adapter.update_user(email, {"is_verified": 1, "otp_code": None, "otp_expires": None})
+        
+        if firebase_initialized:
+            custom_token_bytes = firebase_auth.create_custom_token(email)
+            custom_token = custom_token_bytes.decode('utf-8')
+        else:
+            logger.warning("Firebase not initialized. Returning mock custom token.")
+            custom_token = f"mock-token-{email}"
+            
+        return {"custom_token": custom_token}
+    except Exception as e:
+        logger.error(f"Error in /api/auth/otp-verify: {e}")
+        raise HTTPException(status_code=500, detail=f"Custom token generation failed: {str(e)}")
 
 @app.get("/recordings")
 async def list_recordings(current_user: str = Depends(get_current_user)):
