@@ -51,7 +51,7 @@ export default function Dashboard() {
             Welcome to <span className="gradient-text">CESTS</span>
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-            AI-powered Customer Engagement Sentiment Tracking — Gemini · Whisper · VADER
+            AI-powered Customer Engagement Sentiment Tracking & Analytics
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/analyze')}>

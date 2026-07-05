@@ -99,7 +99,7 @@ export default function Home() {
           marginTop: 10,
         }}>
           Understand Customer Sentiment <br />
-          with <span className="gradient-text">Gemini 2.5 AI & Whisper</span>
+          with <span className="gradient-text">Advanced AI Intelligence</span>
         </h1>
 
         <p style={{
@@ -142,15 +142,15 @@ export default function Home() {
           {[
             {
               title: '🎙️ Audio & Speech to Text',
-              desc: 'Record customer audio directly in your browser or upload files. Whisper AI accurately transcribes speeches on-the-fly.',
+              desc: 'Record customer audio directly in your browser or upload files. Our speech recognition engine transcribes speeches on-the-fly.',
             },
             {
               title: '🧠 Hybrid Sentiment Scoring',
-              desc: 'Combines a custom-trained Bidirectional LSTM model with Rule-based NLTK VADER engines for highly accurate, balanced outputs.',
+              desc: 'Combines custom-trained machine learning classifiers with semantic logic engines for highly accurate, balanced outputs.',
             },
             {
               title: '📝 Intelligent Summaries',
-              desc: 'Generates instant, coherent, multi-sentence summaries, key theme extraction, and actionable steps using Gemini 2.5 Flash.',
+              desc: 'Generates instant, coherent, multi-sentence summaries, key theme extraction, and actionable steps from your transcriptions.',
             },
           ].map((f, i) => (
             <div key={i} className="card" style={{

@@ -127,7 +127,7 @@ export default function Sidebar() {
             </div>
             {health && (
               <div className="status-text" style={{ fontSize: '10.5px', marginTop: '1px' }}>
-                Gemini {health.gemini_enabled ? '✓' : '✗'} · Whisper {health.whisper_enabled ? '✓' : '✗'}
+                Secure Connection
               </div>
             )}
           </div>

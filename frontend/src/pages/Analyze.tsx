@@ -194,7 +194,7 @@ export default function Analyze() {
           <div className="card-header">
             <div>
               <div className="card-title">Record Audio</div>
-              <div className="card-subtitle">Speak and let Whisper AI transcribe + analyze</div>
+              <div className="card-subtitle">Speak and let our AI engine transcribe + analyze</div>
             </div>
           </div>
 
