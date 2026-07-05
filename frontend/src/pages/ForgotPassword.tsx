@@ -21,6 +21,13 @@ export default function ForgotPassword() {
     setError(null);
     setMessage(null);
 
+    // Mock local simulation fallback if Firebase is not configured
+    if (auth.app.options.apiKey === 'mock-api-key') {
+      setMessage('A password reset link has been sent to your email.');
+      setLoading(false);
+      return;
+    }
+
     sendPasswordResetEmail(auth, username)
       .then(() => {
         setMessage('A password reset link has been sent to your email.');

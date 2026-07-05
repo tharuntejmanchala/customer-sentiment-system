@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import Layout from './components/Layout';
@@ -26,8 +26,18 @@ function ProtectedLayout({ authenticated }: { authenticated: boolean }) {
 export default function App() {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const location = useLocation();
 
   useEffect(() => {
+    // Mock local simulation mode if Firebase is not configured
+    if (auth.app.options.apiKey === 'mock-api-key') {
+      const isAuth = localStorage.getItem('authenticated') === 'true';
+      const userEmail = localStorage.getItem('currentUser') || 'demo@example.com';
+      setUser(isAuth ? { email: userEmail } : null);
+      setInitializing(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (usr) => {
       setUser(usr);
       if (usr) {
@@ -40,7 +50,7 @@ export default function App() {
       setInitializing(false);
     });
     return unsubscribe;
-  }, []);
+  }, [location.pathname]);
 
   if (initializing) {
     return (

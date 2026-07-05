@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getHealth } from '../api';
 import type { HealthStatus } from '../types';
+import { auth } from '../firebase';
 
 const navItems = [
   {
@@ -57,6 +58,10 @@ export default function Sidebar() {
   const handleLogout = () => {
     localStorage.removeItem('authenticated');
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('mock_token');
+    if (auth.app.options.apiKey !== 'mock-api-key') {
+      auth.signOut().catch(() => {});
+    }
     navigate('/login');
   };
   useEffect(() => {

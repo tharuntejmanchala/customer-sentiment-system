@@ -30,6 +30,16 @@ export default function Register() {
     setLoading(true);
     setError(null);
 
+    // Mock local simulation fallback if Firebase is not configured
+    if (auth.app.options.apiKey === 'mock-api-key') {
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/login');
+        setLoading(false);
+      }, 1500);
+      return;
+    }
+
     createUserWithEmailAndPassword(auth, username, password)
       .then(() => {
         setSuccess(true);

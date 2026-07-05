@@ -20,6 +20,18 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
+    // Mock local simulation fallback if Firebase is not configured
+    if (auth.app.options.apiKey === 'mock-api-key') {
+      localStorage.setItem('authenticated', 'true');
+      localStorage.setItem('currentUser', username);
+      localStorage.setItem('mock_token', `mock-token-${username}`);
+      setTimeout(() => {
+        navigate('/dashboard');
+        setLoading(false);
+      }, 500);
+      return;
+    }
+
     signInWithEmailAndPassword(auth, username, password)
       .then(async (userCredential) => {
         const user = userCredential.user;
