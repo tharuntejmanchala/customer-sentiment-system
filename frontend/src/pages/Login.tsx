@@ -1,14 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { auth, googleProvider, signInWithPopup, signInWithCustomToken } from '../firebase';
-import { requestOtp, verifyOtpCode } from '../api';
+import { useNavigate, Link } from 'react-router-dom';
+import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword } from '../firebase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -17,10 +14,8 @@ export default function Login() {
   const handleGoogleLogin = () => {
     setLoading(true);
     setError(null);
-    setSuccessMessage(null);
 
     if (isMockMode) {
-      // Mock local simulation
       localStorage.setItem('authenticated', 'true');
       localStorage.setItem('currentUser', 'google-demo@example.com');
       localStorage.setItem('mock_token', 'mock-token-google-demo@example.com');
@@ -46,71 +41,42 @@ export default function Login() {
       });
   };
 
-  const handleRequestOtp = (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      setError('Please enter your email.');
+    if (!email.trim() || !password.trim()) {
+      setError('Please fill in all fields.');
       return;
     }
 
     setLoading(true);
     setError(null);
-    setSuccessMessage(null);
 
     if (isMockMode) {
-      setSuccessMessage('[Simulation Mode] OTP sent! Enter "123456" to proceed.');
-      setOtpSent(true);
-      setLoading(false);
-      return;
-    }
-
-    requestOtp(email)
-      .then((res) => {
-        setSuccessMessage(res.message || 'OTP verification code sent to your email.');
-        setOtpSent(true);
-      })
-      .catch((err) => {
-        setError(err.message || 'Failed to request OTP code.');
-      })
-      .finally(() => {
+      localStorage.setItem('authenticated', 'true');
+      localStorage.setItem('currentUser', email);
+      localStorage.setItem('mock_token', `mock-token-${email}`);
+      setTimeout(() => {
+        navigate('/dashboard');
         setLoading(false);
-      });
-  };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpCode.trim()) {
-      setError('Please enter the 6-digit code.');
+      }, 500);
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    if (isMockMode) {
-      if (otpCode === '123456') {
+    signInWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+        const user = userCredential.user;
         localStorage.setItem('authenticated', 'true');
-        localStorage.setItem('currentUser', email);
-        localStorage.setItem('mock_token', `mock-token-${email}`);
-        navigate('/dashboard');
-      } else {
-        setError('Invalid OTP code. Enter "123456" to log in.');
-      }
-      setLoading(false);
-      return;
-    }
-
-    verifyOtpCode(email, otpCode)
-      .then(async (res) => {
-        // Sign in to Firebase with custom token
-        const userCredential = await signInWithCustomToken(auth, res.custom_token);
-        localStorage.setItem('authenticated', 'true');
-        localStorage.setItem('currentUser', userCredential.user.email || email);
+        localStorage.setItem('currentUser', user.email || 'User');
         navigate('/dashboard');
       })
       .catch((err) => {
-        setError(err.message || 'Invalid or expired OTP code.');
+        let msg = 'Login failed. Please check your credentials.';
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+          msg = 'Invalid email or password.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Invalid email address format.';
+        }
+        setError(msg);
       })
       .finally(() => {
         setLoading(false);
@@ -160,12 +126,6 @@ export default function Login() {
           </div>
         )}
 
-        {successMessage && (
-          <div className="alert mb-4" style={{ padding: '8px 12px', fontSize: 12.5, background: 'var(--color-positive-bg)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--color-positive)' }}>
-            {successMessage}
-          </div>
-        )}
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {/* Google Sign In Option */}
           <button
@@ -195,61 +155,51 @@ export default function Login() {
 
           <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', color: 'var(--text-muted)', fontSize: 11.5 }}>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ padding: '0 10px' }}>or secure email OTP code</span>
+            <span style={{ padding: '0 10px' }}>or secure email & password</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
 
-          {!otpSent ? (
-            <form onSubmit={handleRequestOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="input-group">
-                <label htmlFor="email">Email Address</label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="input-group">
+              <label htmlFor="email">Email Address</label>
+              <input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-              <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: 8 }}>
-                {loading ? 'Sending...' : 'Send Login Code'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div className="input-group">
-                <label htmlFor="otp">Login Code</label>
-                <input
-                  id="otp"
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={e => setOtpCode(e.target.value)}
-                  required
-                  style={{ textAlign: 'center', letterSpacing: '8px', fontSize: 18 }}
-                />
-              </div>
+            <div className="input-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-              <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: 8 }}>
-                {loading ? 'Verifying...' : 'Verify & Sign In'}
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: -8 }}>
+              <Link to="/forgot-password" style={{ color: 'var(--text-muted)', fontSize: 12, textDecoration: 'none' }}>
+                Forgot password?
+              </Link>
+            </div>
 
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setOtpSent(false);
-                  setOtpCode('');
-                }}
-                style={{ fontSize: 12, padding: '4px 8px' }}
-              >
-                Change Email / Resend Code
-              </button>
-            </form>
-          )}
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginTop: 8 }}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              Don't have an account? <Link to="/register" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>Register here</Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

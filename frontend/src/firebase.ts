@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'mock-api-key',
@@ -13,5 +13,5 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
-export { signInWithPopup, signInWithCustomToken };
+export { signInWithPopup, signInWithCustomToken, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail };
 export default app;
