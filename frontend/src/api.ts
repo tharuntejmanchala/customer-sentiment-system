@@ -4,7 +4,10 @@ import { auth } from './firebase';
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = await auth.currentUser?.getIdToken();
+  let token = await auth.currentUser?.getIdToken();
+  if (!token && auth.app.options.apiKey === 'mock-api-key') {
+    token = localStorage.getItem('mock_token') || undefined;
+  }
   const headers = new Headers(options?.headers || {});
   
   if (token && !headers.has('Authorization')) {
