@@ -31,5 +31,10 @@ export default defineConfig(async () => {
 
   return {
     plugins,
+    css: {
+      postcss: {
+        plugins: []
+      }
+    }
   };
 })

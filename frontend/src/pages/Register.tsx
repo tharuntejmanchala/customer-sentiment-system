@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { registerUser } from '../api';
+import { auth } from '../firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -21,23 +22,31 @@ export default function Register() {
       setError('Passwords do not match.');
       return;
     }
-    if (password.length < 4) {
-      setError('Password must be at least 4 characters long.');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    registerUser(username, password)
+    createUserWithEmailAndPassword(auth, username, password)
       .then(() => {
         setSuccess(true);
         setTimeout(() => {
-          navigate('/verify-email', { state: { username } });
+          navigate('/login');
         }, 1500);
       })
       .catch((err) => {
-        setError(err.message || 'Registration failed.');
+        let msg = 'Registration failed. Please try again.';
+        if (err.code === 'auth/email-already-in-use') {
+          msg = 'This email address is already in use.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Invalid email address format.';
+        } else if (err.code === 'auth/weak-password') {
+          msg = 'Password is too weak. Please use a stronger password.';
+        }
+        setError(msg);
       })
       .finally(() => {
         setLoading(false);

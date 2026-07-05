@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Analyze from './pages/Analyze';
@@ -8,12 +11,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
 import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import VerifyEmail from './pages/VerifyEmail';
 
-function ProtectedLayout() {
-  const token = localStorage.getItem('token');
-  if (!token) {
+function ProtectedLayout({ authenticated }: { authenticated: boolean }) {
+  if (!authenticated) {
     return <Navigate to="/login" replace />;
   }
   return (
@@ -24,17 +24,44 @@ function ProtectedLayout() {
 }
 
 export default function App() {
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (usr) => {
+      setUser(usr);
+      if (usr) {
+        localStorage.setItem('authenticated', 'true');
+        localStorage.setItem('currentUser', usr.email || 'User');
+      } else {
+        localStorage.removeItem('authenticated');
+        localStorage.removeItem('currentUser');
+      }
+      setInitializing(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  if (initializing) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16, background: 'var(--bg-base)' }}>
+        <div className="spinner" style={{ width: 36, height: 36 }} />
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Connecting to authentication server...</p>
+      </div>
+    );
+  }
+
+  const authenticated = !!user;
+
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/login" element={authenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/register" element={authenticated ? <Navigate to="/dashboard" replace /> : <Register />} />
+      <Route path="/forgot-password" element={authenticated ? <Navigate to="/dashboard" replace /> : <ForgotPassword />} />
 
       {/* Protected Routes */}
-      <Route element={<ProtectedLayout />}>
+      <Route element={<ProtectedLayout authenticated={authenticated} />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/analyze" element={<Analyze />} />
         <Route path="/history" element={<History />} />

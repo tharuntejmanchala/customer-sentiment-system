@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { loginUser } from '../api';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -19,20 +20,21 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
-    loginUser(username, password)
-      .then(res => {
-        localStorage.setItem('token', res.token);
+    signInWithEmailAndPassword(auth, username, password)
+      .then(async (userCredential) => {
+        const user = userCredential.user;
         localStorage.setItem('authenticated', 'true');
-        localStorage.setItem('currentUser', res.username);
+        localStorage.setItem('currentUser', user.email || 'User');
         navigate('/dashboard');
       })
       .catch(err => {
-        if (err.message && err.message.toLowerCase().includes('verify')) {
-           // Redirect to verify email if the error mentions it
-           navigate('/verify-email', { state: { username } });
-        } else {
-           setError(err.message || 'Invalid email or password.');
+        let msg = 'Login failed. Please check your credentials.';
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+          msg = 'Invalid email or password.';
+        } else if (err.code === 'auth/invalid-email') {
+          msg = 'Invalid email address format.';
         }
+        setError(msg);
       })
       .finally(() => {
         setLoading(false);

@@ -13,3 +13,4 @@ aiofiles
 pymongo
 pymongo[srv]
 PyJWT==2.8.0
+firebase-admin==6.5.0
