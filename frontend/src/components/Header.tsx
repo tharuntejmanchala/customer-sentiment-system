@@ -1,15 +1,29 @@
+import { useNavigate } from 'react-router-dom';
+import { auth } from '../firebase';
+
 interface HeaderProps {
   title: string;
   subtitle?: string;
 }
 
 export default function Header({ title, subtitle }: HeaderProps) {
+  const navigate = useNavigate();
   let currentUser = localStorage.getItem('currentUser') || 'User';
   if (currentUser.includes('@')) {
     currentUser = currentUser.split('@')[0];
   }
   currentUser = currentUser.replace(/[0-9]/g, '');
   currentUser = currentUser.charAt(0).toUpperCase() + currentUser.slice(1);
+
+  const handleLogout = () => {
+    localStorage.removeItem('authenticated');
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('mock_token');
+    if (auth.app.options.apiKey !== 'mock-api-key') {
+      auth.signOut().catch(() => {});
+    }
+    navigate('/login');
+  };
 
   return (
     <header className="page-header">
@@ -46,12 +60,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
           {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
         </div>
         <button 
-          onClick={() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('authenticated');
-            localStorage.removeItem('currentUser');
-            window.location.href = '/login';
-          }}
+          onClick={handleLogout}
           style={{
             fontSize: 12,
             background: 'transparent',
